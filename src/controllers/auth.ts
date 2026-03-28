@@ -15,8 +15,20 @@ export async function authUser(req: Request, res: Response) {
 
 export async function registerUser(req: Request, res: Response) {
   const { email, password, username } = req.body;
+
   if (!email || !password || !username) {
     return res.status(400).json({ message: "Something went wrong." });
+  }
+
+  if (username.length < 3) {
+    return res
+      .status(400)
+      .json({ message: "Usernames can be 3 to 20 characters long." });
+  }
+  if (password.length < 8) {
+    return res
+      .status(400)
+      .json({ message: "Password must be at least 8 characters." });
   }
 
   const { data: existingUser } = await supabase
@@ -26,13 +38,7 @@ export async function registerUser(req: Request, res: Response) {
     .single();
 
   if (existingUser) {
-    return res.status(409).json({ message: "Username is already taken" });
-  }
-
-  if (password.length < 8) {
-    return res
-      .status(400)
-      .json({ message: "Password must be at least 8 characters" });
+    return res.status(409).json({ message: "Username is already taken." });
   }
 
   const { data, error } = await supabase.auth.signUp({
@@ -48,6 +54,11 @@ export async function registerUser(req: Request, res: Response) {
   if (error) {
     return res.status(400).json({ message: error.message });
   }
+
+  if (data.user && data.user.identities?.length === 0) {
+    return res.status(409).json({ message: "Email is already used." });
+  }
+
   return res
     .status(201)
     .json({ message: "Check your email to confirm your account." });
