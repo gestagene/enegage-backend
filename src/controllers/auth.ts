@@ -13,6 +13,24 @@ export async function authUser(req: Request, res: Response) {
   return res.status(200).json({ user: data.user, session: data.session });
 }
 
+export async function authGoogle(req: Request, res: Response) {
+  const { token } = req.body;
+
+  const { data, error } = await supabase.auth.signInWithIdToken({
+    provider: "google",
+    token,
+  });
+
+  if (error) {
+    return res.status(401).json({ message: error.message });
+  }
+
+  return res.status(200).json({
+    user: data.user,
+    session: data.session,
+  });
+}
+
 export async function registerUser(req: Request, res: Response) {
   const { email, password, username } = req.body;
 
@@ -25,6 +43,7 @@ export async function registerUser(req: Request, res: Response) {
       .status(400)
       .json({ message: "Usernames can be 3 to 20 characters long." });
   }
+
   if (password.length < 8) {
     return res
       .status(400)
