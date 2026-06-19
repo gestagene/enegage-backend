@@ -4,7 +4,8 @@ import {
   getPost,
   updatePost,
   deletePost,
-} from "../controllers/posts.js";
+} from "../posts/posts.controller.js";
+
 import express from "express";
 const router = express.Router();
 

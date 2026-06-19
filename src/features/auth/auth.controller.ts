@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import supabase from "../supabase-client.js";
+import supabase from "../../lib/supabase-client.js";
 
 export async function authUser(req: Request, res: Response) {
   const { email, password } = req.body;
