@@ -5,14 +5,16 @@ import {
   updatePost,
   deletePost,
 } from "../posts/posts.controller.js";
+import { requireAuth } from "../../middleware/auth.middleware.js";
 
 import express from "express";
 const router = express.Router();
 
 router.get("/", getPosts);
-router.post("/", createPost);
 router.get("/:id", getPost);
-router.put("/:id", updatePost);
-router.delete("/:id", deletePost);
+
+router.post("/", requireAuth, createPost);
+router.put("/:id", requireAuth, updatePost);
+router.delete("/:id", requireAuth, deletePost);
 
 export default router;
