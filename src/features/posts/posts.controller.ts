@@ -2,8 +2,9 @@ import { Request, Response } from "express";
 import supabase from "../../lib/supabase-client.js";
 
 export async function createPost(req: Request, res: Response) {
-  const { title, body, post_type } = req.body;
+  const { title, body, post_type, link_url } = req.body;
   const user_id = req.user!.id;
+  const imageFile = req.file;
 
   if (!title) {
     return res.status(400).json({ message: "Title field is required" });
@@ -11,16 +12,58 @@ export async function createPost(req: Request, res: Response) {
   if (!post_type) {
     return res.status(400).json({ message: "Invalid post type" });
   }
+  if (post_type === "link" && !link_url) {
+    return res.status(400).json({ message: "Link URL is required" });
+  }
+  if (post_type === "image" && !imageFile) {
+    return res.status(400).json({ message: "Missing image file" });
+  }
 
-  const { data, error } = await supabase
+  let media_url: string | null = null;
+  let media_type: string | null = null;
+
+  if (imageFile) {
+    const fileExt = imageFile.originalname.split(".").pop();
+    const filePath = `${user_id}/${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("post-media")
+      .upload(filePath, imageFile.buffer, {
+        contentType: imageFile.mimetype,
+      });
+    if (uploadError) {
+      return res.status(400).json({ message: uploadError.message });
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from("post-media")
+      .getPublicUrl(filePath);
+
+    media_url = publicUrlData.publicUrl;
+    media_type = imageFile.mimetype;
+  }
+
+  const { data: post, error: postError } = await supabase
     .from("posts")
-    .insert({ title, body, post_type, user_id })
+    .insert({ title, body, post_type, user_id, link_url })
     .select()
     .single();
-  if (error) {
-    return res.status(400).json({ message: error.message });
+  if (postError) {
+    return res.status(400).json({ message: postError.message });
   }
-  return res.status(201).json({ post: data });
+
+  if (media_url) {
+    const { error: mediaError } = await supabase.from("media").insert({
+      post_id: post.id,
+      media_url,
+      media_type,
+    });
+
+    if (mediaError) {
+      return res.status(400).json({ message: mediaError.message });
+    }
+  }
+  return res.status(201).json({ post });
 }
 
 export async function getPosts(req: Request, res: Response) {
@@ -31,7 +74,7 @@ export async function getPosts(req: Request, res: Response) {
     *,
     users (
       username
-    )
+    ), media ( media_url, media_type)
   `,
     )
     .order("created_at", { ascending: false });
