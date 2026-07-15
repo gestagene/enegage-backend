@@ -1,9 +1,10 @@
 import { Request, Response } from "express";
-import supabase from "../../lib/supabase-client.js";
+import { createAuthClient } from "../../lib/supabase-auth-client.js";
 
 export async function authUser(req: Request, res: Response) {
+  const supabaseAuth = createAuthClient();
   const { email, password } = req.body;
-  const { data, error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabaseAuth.auth.signInWithPassword({
     email,
     password,
   });
@@ -14,9 +15,10 @@ export async function authUser(req: Request, res: Response) {
 }
 
 export async function authGoogle(req: Request, res: Response) {
+  const supabaseAuth = createAuthClient();
   const { token } = req.body;
 
-  const { data, error } = await supabase.auth.signInWithIdToken({
+  const { data, error } = await supabaseAuth.auth.signInWithIdToken({
     provider: "google",
     token,
   });
@@ -32,8 +34,8 @@ export async function authGoogle(req: Request, res: Response) {
 }
 
 export async function registerUser(req: Request, res: Response) {
+  const supabaseAuth = createAuthClient();
   const { email, password, username } = req.body;
-
   if (!email || !password || !username) {
     return res.status(400).json({ message: "Something went wrong." });
   }
@@ -50,7 +52,7 @@ export async function registerUser(req: Request, res: Response) {
       .json({ message: "Password must be at least 8 characters." });
   }
 
-  const { data: existingUser } = await supabase
+  const { data: existingUser } = await supabaseAuth
     .from("profiles")
     .select("username")
     .eq("username", username)
@@ -60,7 +62,7 @@ export async function registerUser(req: Request, res: Response) {
     return res.status(409).json({ message: "Username is already taken." });
   }
 
-  const { data, error } = await supabase.auth.signUp({
+  const { data, error } = await supabaseAuth.auth.signUp({
     email,
     password,
     options: {
