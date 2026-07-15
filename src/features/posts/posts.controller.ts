@@ -90,7 +90,13 @@ export async function getPost(req: Request, res: Response) {
   const { id } = req.params;
   const { data, error } = await supabase
     .from("posts")
-    .select("*")
+    .select(
+      `
+      *,
+      users ( username ),
+      media ( media_url, media_type )
+    `,
+    )
     .eq("id", id)
     .single();
 
