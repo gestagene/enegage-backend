@@ -11,7 +11,9 @@ export async function createComment(req: Request, res: Response) {
       .status(401)
       .json({ message: "You must be logged in to post a comment" });
   }
-
+  if (!post_id) {
+    return res.status(400).json({ message: "Post doesn't exist" });
+  }
   if (!content) {
     return res.status(400).json({ message: "Comment content can't be empty" });
   }
@@ -34,13 +36,13 @@ export async function getComments(req: Request, res: Response) {
 
   const { data: comments, error } = await supabase
     .from("comments")
-    .select("content")
+    .select(`id, content, created_at, users(username)`)
     .eq("post_id", post_id)
     .order("created_at", { ascending: false });
   if (error) {
     return res.status(400).json({ message: error.message });
   }
-  return res.status(201).json({ comments });
+  return res.status(200).json({ comments });
 }
 
 export async function deleteComment(req: Request, res: Response) {

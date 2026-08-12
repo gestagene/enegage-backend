@@ -8,9 +8,9 @@ import express from "express";
 
 const router = express.Router();
 
-router.get("/", getComments);
+router.get("/:post_id", getComments);
 
-router.post("/", requireAuth, createComment);
-router.delete("/:id", requireAuth, deleteComment);
+router.post("/:post_id", requireAuth, createComment);
+router.delete("/:post_id", requireAuth, deleteComment);
 
 export default router;
