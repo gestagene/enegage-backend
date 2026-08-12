@@ -67,43 +67,65 @@ export async function createPost(req: Request, res: Response) {
 }
 
 export async function getPosts(req: Request, res: Response) {
-  const { data, error } = await supabase
-    .from("posts")
-    .select(
-      `
-    *,
-    users (
-      username
-    ), media ( media_url, media_type)
-  `,
-    )
-    .order("created_at", { ascending: false });
+  const user_id = req.user?.id;
 
-  if (error) {
-    return res.status(400).json({ message: error.message });
-  }
-
-  return res.status(200).json({ posts: data });
-}
-
-export async function getPost(req: Request, res: Response) {
-  const { id } = req.params;
-  const { data, error } = await supabase
+  let query = supabase
     .from("posts")
     .select(
       `
       *,
-      users ( username ),
-      media ( media_url, media_type )
+      users (username),
+      media (media_url, media_type),
+      votes (vote_type)
     `,
     )
-    .eq("id", id)
-    .single();
+    .order("created_at", { ascending: false });
+
+  if (user_id) {
+    query = query.eq("votes.user_id", user_id);
+  }
+
+  const { data, error } = await query;
+
+  if (error) return res.status(400).json({ message: error.message });
+
+  const posts = data.map((post) => ({
+    ...post,
+    user_vote: post.votes?.[0]?.vote_type ?? null,
+    votes: undefined,
+  }));
+
+  return res.status(200).json(posts);
+}
+
+export async function getPost(req: Request, res: Response) {
+  const { id } = req.params;
+  const user_id = req.user?.id;
+
+  let query = supabase
+    .from("posts")
+    .select(
+      `*, users (username), media (media_url, media_type), votes (vote_type)`,
+    )
+    .eq("id", id);
+
+  if (user_id) {
+    query = query.eq("votes.user_id", user_id);
+  }
+
+  const { data, error } = await query.single();
 
   if (error) {
     return res.status(404).json({ message: "Post not found" });
   }
-  return res.status(200).json({ post: data });
+
+  const post = {
+    ...data,
+    user_vote: data.votes?.[0]?.vote_type ?? null,
+    votes: undefined,
+  };
+
+  return res.status(200).json({ post });
 }
 
 export async function updatePost(req: Request, res: Response) {
@@ -121,7 +143,9 @@ export async function updatePost(req: Request, res: Response) {
     return res.status(404).json({ message: "Post not found" });
   }
   if (post?.user_id !== user_id) {
-    return res.status(403).json({ message: "Unauthorized action" });
+    return res
+      .status(403)
+      .json({ message: "You do not have permission to edit this post." });
   }
 
   const { data, error } = await supabase
@@ -151,7 +175,9 @@ export async function deletePost(req: Request, res: Response) {
     return res.status(404).json({ message: "Post not found" });
   }
   if (post?.user_id !== user_id) {
-    return res.status(403).json({ message: "Unauthorized action" });
+    return res
+      .status(403)
+      .json({ message: "You do not have permission to delete this post" });
   }
 
   const { error } = await supabase.from("posts").delete().eq("id", id);
