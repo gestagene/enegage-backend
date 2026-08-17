@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import supabase from "../../lib/supabase-client.js";
+import { checkUrlSafety } from "../../lib/safebrowsing.js";
 
 export async function createPost(req: Request, res: Response) {
   const { title, body, post_type, link_url } = req.body;
@@ -12,11 +13,17 @@ export async function createPost(req: Request, res: Response) {
   if (!post_type) {
     return res.status(400).json({ message: "Invalid post type" });
   }
-  if (post_type === "link" && !link_url) {
-    return res.status(400).json({ message: "Link URL is required" });
-  }
   if (post_type === "image" && !imageFile) {
     return res.status(400).json({ message: "Missing image file" });
+  }
+
+  if (link_url) {
+    const safety = await checkUrlSafety(req.body);
+    if (!safety) {
+      return res
+        .status(400)
+        .json({ message: "This URL is unsafe and cannot be posted" });
+    }
   }
 
   let media_url: string | null = null;
@@ -76,7 +83,8 @@ export async function getPosts(req: Request, res: Response) {
       *,
       users (username),
       media (media_url, media_type),
-      votes (vote_type)
+      votes (vote_type),
+      comments (count)
     `,
     )
     .order("created_at", { ascending: false });
@@ -93,6 +101,8 @@ export async function getPosts(req: Request, res: Response) {
     ...post,
     user_vote: post.votes?.[0]?.vote_type ?? null,
     votes: undefined,
+    comment_count: post.comments?.[0]?.count ?? 0,
+    comments: undefined,
   }));
 
   return res.status(200).json(posts);
@@ -105,7 +115,7 @@ export async function getPost(req: Request, res: Response) {
   let query = supabase
     .from("posts")
     .select(
-      `*, users (username), media (media_url, media_type), votes (vote_type)`,
+      `*, users (username), media (media_url, media_type), votes (vote_type), comments (count)`,
     )
     .eq("id", id);
 
@@ -123,6 +133,8 @@ export async function getPost(req: Request, res: Response) {
     ...data,
     user_vote: data.votes?.[0]?.vote_type ?? null,
     votes: undefined,
+    comment_count: data.comments?.[0]?.count ?? 0,
+    comments: undefined,
   };
 
   return res.status(200).json({ post });
