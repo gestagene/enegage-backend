@@ -6,11 +6,6 @@ export async function createComment(req: Request, res: Response) {
   const { post_id } = req.params;
   const { content } = req.body;
 
-  if (!user_id) {
-    return res
-      .status(401)
-      .json({ message: "You must be logged in to post a comment" });
-  }
   if (!post_id) {
     return res.status(400).json({ message: "Post doesn't exist" });
   }
@@ -25,6 +20,9 @@ export async function createComment(req: Request, res: Response) {
     .single();
 
   if (error) {
+    if (error.code === "23503") {
+      return res.status(404).json({ message: "Post no longer exists" });
+    }
     return res.status(400).json({ message: error.message });
   }
 
@@ -33,29 +31,44 @@ export async function createComment(req: Request, res: Response) {
 
 export async function getComments(req: Request, res: Response) {
   const { post_id } = req.params;
+  const user_id = req.user?.id;
 
-  const { data: comments, error } = await supabase
+  let query = supabase
     .from("comments")
-    .select(`id, content, created_at, users(username)`)
+    .select(
+      `id, content, created_at, vote_score, users(username), comment_votes(vote_type)`,
+    )
     .eq("post_id", post_id)
     .order("created_at", { ascending: false });
-  if (error) {
-    return res.status(400).json({ message: error.message });
+
+  if (user_id) {
+    query = query.eq("comment_votes.user_id", user_id);
   }
+
+  const { data, error } = await query;
+
+  if (error) return res.status(400).json({ message: error.message });
+
+  const comments = data.map((comment) => ({
+    ...comment,
+    user_vote: comment.comment_votes?.[0]?.vote_type ?? null,
+    comment_votes: undefined,
+  }));
+
   return res.status(200).json({ comments });
 }
 
 export async function deleteComment(req: Request, res: Response) {
-  const { id } = req.params;
+  const { post_id } = req.params;
   const user_id = req.user!.id;
 
   const { data: comment, error: fetchError } = await supabase
     .from("comments")
     .select("user_id")
-    .eq("id", id)
+    .eq("id", post_id)
     .single();
 
-  if (fetchError) {
+  if (fetchError || !comment) {
     return res.status(404).json({ message: "Comment not found" });
   }
   if (comment?.user_id !== user_id) {
@@ -64,7 +77,7 @@ export async function deleteComment(req: Request, res: Response) {
       .json({ message: "You do not have permission to delete this comment" });
   }
 
-  const { error } = await supabase.from("comments").delete().eq("id", id);
+  const { error } = await supabase.from("comments").delete().eq("id", post_id);
 
   if (error) {
     return res.status(400).json({ message: error.message });
