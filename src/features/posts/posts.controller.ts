@@ -74,20 +74,24 @@ export async function createPost(req: Request, res: Response) {
 }
 
 export async function getPosts(req: Request, res: Response) {
+  const sort = (req.query.sort as string) ?? "new";
   const user_id = req.user?.id;
 
-  let query = supabase
-    .from("posts")
-    .select(
-      `
+  let query = supabase.from("posts").select(
+    `
       *,
       users (username),
       media (media_url, media_type),
       votes (vote_type),
       comments (count)
     `,
-    )
-    .order("created_at", { ascending: false });
+  );
+
+  if (sort === "top") {
+    query = query.order("vote_score", { ascending: false });
+  } else {
+    query = query.order("created_at", { ascending: false });
+  }
 
   if (user_id) {
     query = query.eq("votes.user_id", user_id);
