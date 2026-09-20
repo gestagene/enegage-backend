@@ -3,73 +3,66 @@ import supabase from "../../lib/supabase-client.js";
 import { checkUrlSafety } from "../../lib/safebrowsing.js";
 
 export async function createPost(req: Request, res: Response) {
-  const { title, body, post_type, link_url } = req.body;
   const user_id = req.user!.id;
-  const imageFile = req.file;
+  const { title, body: rawBody } = req.body;
+  const imageFiles = req.files as Express.Multer.File[];
 
   if (!title) {
     return res.status(400).json({ message: "Title field is required" });
   }
-  if (!post_type) {
-    return res.status(400).json({ message: "Invalid post type" });
-  }
-  if (post_type === "image" && !imageFile) {
-    return res.status(400).json({ message: "Missing image file" });
-  }
 
-  if (link_url) {
-    const safety = await checkUrlSafety(req.body);
-    if (!safety) {
-      return res
-        .status(400)
-        .json({ message: "This URL is unsafe and cannot be posted" });
+  let body: Record<string, unknown> | undefined;
+
+  if (rawBody) {
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      return res.status(400).json({ message: "Invalid body format" });
     }
   }
-
-  let media_url: string | null = null;
-  let media_type: string | null = null;
-
-  if (imageFile) {
-    const fileExt = imageFile.originalname.split(".").pop();
-    const filePath = `${user_id}/${Date.now()}.${fileExt}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("post-media")
-      .upload(filePath, imageFile.buffer, {
-        contentType: imageFile.mimetype,
-      });
-    if (uploadError) {
-      return res.status(400).json({ message: uploadError.message });
-    }
-
-    const { data: publicUrlData } = supabase.storage
-      .from("post-media")
-      .getPublicUrl(filePath);
-
-    media_url = publicUrlData.publicUrl;
-    media_type = imageFile.mimetype;
-  }
-
   const { data: post, error: postError } = await supabase
     .from("posts")
-    .insert({ title, body, post_type, user_id, link_url })
+    .insert({ title, body, user_id })
     .select()
     .single();
   if (postError) {
     return res.status(400).json({ message: postError.message });
   }
 
-  if (media_url) {
-    const { error: mediaError } = await supabase.from("media").insert({
-      post_id: post.id,
-      media_url,
-      media_type,
-    });
+  if (imageFiles && imageFiles.length > 0) {
+    const uploadResults = await Promise.all(
+      imageFiles.map(async (file) => {
+        const fileExt = file.originalname.split(".").pop();
+        const filePath = `${user_id}/${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("post-media")
+          .upload(filePath, file.buffer, {
+            contentType: file.mimetype,
+          });
+
+        if (uploadError) throw new Error(uploadError.message);
+
+        const { data: publicUrlData } = supabase.storage
+          .from("post-media")
+          .getPublicUrl(filePath);
+
+        return {
+          post_id: post.id,
+          media_url: publicUrlData.publicUrl,
+          media_type: file.mimetype,
+        };
+      }),
+    );
+    const { error: mediaError } = await supabase
+      .from("media")
+      .insert(uploadResults);
 
     if (mediaError) {
       return res.status(400).json({ message: mediaError.message });
     }
   }
+
   return res.status(201).json({ post });
 }
 
