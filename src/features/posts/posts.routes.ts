@@ -18,7 +18,7 @@ const upload = multer({
 router.get("/", getPosts);
 router.get("/:id", getPost);
 
-router.post("/", requireAuth, upload.single("image"), createPost);
+router.post("/", requireAuth, upload.array("imageFiles"), createPost);
 router.put("/:id", requireAuth, updatePost);
 router.delete("/:id", requireAuth, deletePost);
 
