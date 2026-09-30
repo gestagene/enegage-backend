@@ -36,7 +36,7 @@ export async function getComments(req: Request, res: Response) {
   let query = supabase
     .from("comments")
     .select(
-      `id, content, created_at, vote_score, users(username), comment_votes(vote_type)`,
+      `id, content, created_at, vote_score, users(username, avatar_url), comment_votes(vote_type)`,
     )
     .eq("post_id", post_id)
     .order("created_at", { ascending: false });
