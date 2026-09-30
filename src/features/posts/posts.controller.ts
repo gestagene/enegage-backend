@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
 import supabase from "../../lib/supabase-client.js";
-import { checkUrlSafety } from "../../lib/safebrowsing.js";
 
 export async function createPost(req: Request, res: Response) {
   const user_id = req.user!.id;
@@ -73,7 +72,7 @@ export async function getPosts(req: Request, res: Response) {
   let query = supabase.from("posts").select(
     `
       *,
-      users (username),
+      users (username, avatar_url),
       media (media_url, media_type),
       votes (vote_type),
       comments (count)
@@ -112,7 +111,7 @@ export async function getPost(req: Request, res: Response) {
   let query = supabase
     .from("posts")
     .select(
-      `*, users (username), media (media_url, media_type), votes (vote_type), comments (count)`,
+      `*, users (username, avatar_url), media (media_url, media_type), votes (vote_type), comments (count)`,
     )
     .eq("id", id);
 
