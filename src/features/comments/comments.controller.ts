@@ -1,10 +1,10 @@
 import { Request, Response } from "express";
 import supabase from "../../lib/supabase-client.js";
 
+//generic select query
 const BASE_SELECT = `
   id, content, created_at, vote_score, post_id, parent_comment_id,
-  user:users(id, username, avatar_url),
-  replies:comments!comments_parent_comment_id_fkey(count)
+  users(id, username, avatar_url)
 `;
 
 const selectFor = (user_id?: string) =>
@@ -50,7 +50,7 @@ export async function getComments(req: Request, res: Response) {
 
   let query = supabase
     .from("comments")
-    .select(`${selectFor(user_id)}`)
+    .select(selectFor(user_id))
     .eq("post_id", post_id)
     .is("parent_comment_id", null)
     .order("created_at", { ascending: false });
