@@ -2,15 +2,46 @@ import {
   createComment,
   getComments,
   deleteComment,
+  replies,
 } from "./comments.controller.js";
-import { requireAuth } from "../../middleware/auth.middleware.js";
+import { validateRequest } from "../../middleware/validateRequest.js";
+import {
+  createCommentSchema,
+  deleteCommentSchema,
+  getCommentsSchema,
+  repliesSchema,
+} from "./schemas/comment.schema.js";
+import { optionalAuth, requireAuth } from "../../middleware/auth.middleware.js";
 import express from "express";
 
 const router = express.Router();
 
-router.get("/:post_id", getComments);
+//Comments
+router.get(
+  "/:post_id/comments",
+  optionalAuth,
+  validateRequest(getCommentsSchema),
+  getComments,
+);
+router.post(
+  "/:post_id/comments",
+  requireAuth,
+  validateRequest(createCommentSchema),
+  createComment,
+);
+router.delete(
+  "/:comment_id",
+  requireAuth,
+  validateRequest(deleteCommentSchema),
+  deleteComment,
+);
 
-router.post("/:post_id", requireAuth, createComment);
-router.delete("/:post_id", requireAuth, deleteComment);
+//replies
+router.get(
+  "/:comment_id/replies",
+  optionalAuth,
+  validateRequest(repliesSchema),
+  replies,
+);
 
 export default router;
