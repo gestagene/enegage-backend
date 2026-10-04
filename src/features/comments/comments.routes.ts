@@ -18,13 +18,13 @@ const router = express.Router();
 
 //Comments
 router.get(
-  "/:post_id/comments",
+  "/:post_id",
   optionalAuth,
   validateRequest(getCommentsSchema),
   getComments,
 );
 router.post(
-  "/:post_id/comments",
+  "/:post_id",
   requireAuth,
   validateRequest(createCommentSchema),
   createComment,
